@@ -21,7 +21,32 @@ export default Server(() => {
     const app = express();
     app.use(express.json());
 
+    function handleMessageUpdateOrDelete(req, res, action) {
+        const messageId = req.params.id;
+        const messageOpt = messagesStorage.get(messageId);
+        if (!messageOpt) {
+            return res.status(400).send(`Message with id=${messageId} not found`);
+        }
+        const message = messageOpt.Some;
+
+        if (action === 'update') {
+            const updatedMessage = { ...message, ...req.body, updatedAt: getCurrentDate() };
+            messagesStorage.insert(message.id, updatedMessage);
+            res.json(updatedMessage);
+        } else if (action === 'delete') {
+            const deletedMessage = messagesStorage.remove(messageId);
+            res.json(deletedMessage.Some);
+        }
+    }
+
     app.post("/messages", (req, res) => {
+        const { title, body, attachmentURL } = req.body;
+
+        // Validate required fields
+        if (!title || !body) {
+            return res.status(400).send('Title and Body are required');
+        }
+
         const message: Message = { id: uuidv4(), createdAt: getCurrentDate(), ...req.body };
         messagesStorage.insert(message.id, message);
         res.json(message);
@@ -63,6 +88,12 @@ export default Server(() => {
             res.json(deletedMessage.Some);
         }
     });
+
+    app.use((err, req, res, next) => {
+        console.error(err.stack);
+        res.status(500).send('Something went wrong!');
+    });
+    
 
     function getCurrentDate() {
         const timestamp = new Number(ic.time());
